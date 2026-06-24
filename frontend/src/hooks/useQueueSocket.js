@@ -40,7 +40,8 @@ export function useQueueSocket() {
 
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch('/api/queue');
+      const base = import.meta.env.VITE_API_URL || '';
+      const res = await fetch(`${base}/api/queue`);
       if (!res.ok) throw new Error('Failed to fetch queue');
       const data = await res.json();
       setQueue(data);
