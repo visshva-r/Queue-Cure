@@ -40,7 +40,7 @@ async function connectDatabase() {
     const mongod = await MongoMemoryServer.create();
     const uri = mongod.getUri('queue-cure');
     await mongoose.connect(uri);
-    console.log('Using in-memory MongoDB (local development — data resets on restart)');
+    console.log('Using in-memory MongoDB (local dev, data resets on restart)');
     return;
   }
 
@@ -63,7 +63,7 @@ async function start() {
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
       console.error(`\nPort ${PORT} is already in use.`);
-      console.error('Another backend is already running — you do NOT need to start it again.');
+      console.error('Another backend is already running on this port.');
       console.error(`Check: http://localhost:${PORT}/health`);
       console.error('To restart: stop the other terminal (Ctrl+C) or run:');
       console.error(`  netstat -ano | findstr :${PORT}`);

@@ -70,7 +70,7 @@ async function testQueueSnapshot() {
   if (waiting) {
     assert(typeof waiting.estimatedWaitMinutes === 'number', 'wait time is a number');
     assert(waiting.estimatedWaitMinutes >= 0, 'wait time non-negative');
-    ok(`wait time = ${waiting.estimatedWaitMinutes} min (from real queue data)`);
+    ok(`wait time = ${waiting.estimatedWaitMinutes} min`);
   }
   return body;
 }
@@ -136,7 +136,7 @@ async function testLiveSocket() {
 }
 
 async function main() {
-  console.log('Queue Cure — automated smoke test (no AI quota used)');
+  console.log('Queue Cure smoke test');
   console.log(`Target: ${BASE}`);
 
   try {

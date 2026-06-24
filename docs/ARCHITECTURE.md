@@ -1,69 +1,61 @@
-# Architecture & Design — Queue Cure
+# Architecture
 
-## Problem framing
+## Problem
 
-Indian neighbourhood clinics lose hours of patient goodwill to opaque paper queues. The fix is not "an app" — it is **shared truth**: one queue state, two views, zero refresh, wait times patients can trust.
+Many small clinics still use paper tokens. Patients do not know their place in line or how long they will wait. Reception and waiting room need the same queue state without manual refresh.
 
-## Design decisions
+## Real-time sync
 
-### 1. Full snapshot over granular events
+The server sends a full `queue:update` snapshot after every change instead of partial field updates.
 
-**Choice:** Broadcast complete `queue:update` snapshots instead of per-field deltas.
+Both screens always get the same data. Reconnecting clients receive `queue:sync` with the same payload shape. The trade-off is a slightly larger message per event, which is fine at clinic scale.
 
-**Why:** Two screens must never disagree. A snapshot guarantees receptionist and waiting room see identical state after every action. Reconnecting clients get `queue:sync` with the same shape.
+## Wait time
 
-**Trade-off:** Slightly more bytes per event; negligible at clinic scale (<100 patients/day).
-
-### 2. Wait time from real data
-
-**Formula:**
 ```
 estimatedWaitMinutes = patientsAhead × effectiveAvgMinutes
 ```
 
-Where:
-- `patientsAhead` = position in waiting list + 1 if someone is currently in consultation
-- `effectiveAvgMinutes` = rolling mean of last **20 completed** consultation durations
-- **Fallback:** receptionist-set baseline until enough completions exist
+- `patientsAhead`: position in the waiting list, plus 1 if someone is in consultation
+- `effectiveAvgMinutes`: mean of the last 20 completed consultation durations
+- fallback: receptionist-set average until enough visits are recorded
 
-**Why not hardcode a fixed average?** After a few completed visits, averages reflect *this doctor, today* — fast visits pull estimates down; complex cases pull them up.
+On complete, `calledAt` and `completedAt` are saved to `ConsultationRecord` for the rolling average.
 
-**Data captured on complete:** `calledAt` → `completedAt` → stored in `ConsultationRecord` for rolling average.
-
-### 3. Receptionist speed & mistake-proofing
+## Receptionist UI
 
 | Feature | Purpose |
 |---------|---------|
-| Single name field + Enter | Sub-10-second token issue |
-| Auto-increment tokens | No manual numbering errors |
-| "Call next" blocked if consultation open | Prevents double-call |
-| Atomic `findOneAndUpdate` with sort | Lowest token always called first |
-| Done / No-show / Remove | Recover from mistakes without paper chaos |
-| Keyboard shortcut `N` | Hands stay on keyboard during rush |
-| Reset day | Clean start tomorrow |
+| Single name field + Enter | Fast token issue |
+| Auto-increment tokens | No manual numbering |
+| Block call-next during consultation | Prevents double-call |
+| Atomic `findOneAndUpdate` with sort | Lowest token called first |
+| Done / no-show / remove | Handle mistakes |
+| Shortcut `N` | Call next from keyboard |
+| Reset day | Clear queue for next day |
 
-### 4. Concurrency & edge cases
+## Concurrency and edge cases
 
 | Scenario | Handling |
 |----------|----------|
-| Two receptionists click "Call Next" | MongoDB `findOneAndUpdate` is atomic — only one wins; other gets 409 "Finish current first" or 404 "No patients waiting" |
-| Patient leaves while waiting | Receptionist removes from queue; wait times recalculate for everyone via broadcast |
-| No-show at consultation | Mark no-show, slot freed, next can be called |
-| Socket disconnect | Client reconnects → `queue:sync` restores full state; REST `/api/queue` fallback in hook |
-| Server restart | MongoDB persists queue; clients reconnect and sync |
-| Empty queue call-next | 404 with clear message — no silent failure |
-| End of day | Reset clears waiting + in-consultation, resets token counter to 1 |
+| Two call-next clicks | `findOneAndUpdate` is atomic; second request gets 409 or 404 |
+| Patient leaves | Remove from queue; broadcast recalculates wait times |
+| No-show | Mark no-show, free the slot |
+| Socket disconnect | Reconnect gets `queue:sync`; REST fallback in hook |
+| Server restart | Queue persisted in MongoDB |
+| Empty queue call-next | 404 with error message |
+| End of day | Reset clears active queue, token counter back to 1 |
 
-### 5. Why MongoDB?
+## Why MongoDB
 
-- Document model fits queue entries + settings naturally
+- Documents fit queue entries and settings
 - Atomic find-and-update for ordered dequeue
-- Pairs well with Express for a small-clinic deployment
+- Works well with Express for a single-clinic deploy
 
-### 6. Roadmap
+## Roadmap
 
-- Multi-clinic `clinicId` from URL (schema already supports it)
-- Patient self-check-in via QR code
-- SMS/WhatsApp when token is 2 away
-- Admin analytics dashboard for doctors
-- Rate limiting on public waiting room endpoint
+- Multi-clinic support via `clinicId` in URL
+- QR self check-in
+- SMS when two patients ahead
+- Doctor analytics dashboard
+- Rate limiting on public waiting room

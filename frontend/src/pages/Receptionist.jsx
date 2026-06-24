@@ -57,7 +57,7 @@ export default function Receptionist() {
   async function handleComplete() {
     const result = await runAction(() => api.complete(), 'Consultation completed');
     if (result?.consultationDurationMinutes) {
-      showToast(`Recorded ${result.consultationDurationMinutes} min — avg will update`);
+      showToast(`Recorded ${result.consultationDurationMinutes} min. Average will update.`);
     }
   }
 
@@ -120,7 +120,7 @@ export default function Receptionist() {
       <section className="grid-2">
         <div className="card highlight">
           <h2>Add patient</h2>
-          <p className="hint">Name + Enter — token auto-assigned in one step</p>
+          <p className="hint">Enter name and press Enter to assign a token</p>
           <form onSubmit={handleAdd} className="add-form">
             <input
               ref={nameRef}
@@ -168,7 +168,7 @@ export default function Receptionist() {
         {hasCurrent ? (
           <div className="now-token">#{queue.currentToken}</div>
         ) : (
-          <div className="now-empty">—</div>
+          <div className="now-empty">-</div>
         )}
         {hasCurrent && <p className="now-name">{queue.currentPatientName}</p>}
         <div className="action-row">

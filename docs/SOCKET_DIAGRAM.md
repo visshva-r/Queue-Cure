@@ -1,4 +1,4 @@
-# Socket Event Diagram — Queue Cure
+# Socket Events
 
 ## Architecture overview
 
@@ -36,7 +36,7 @@ Client                          Server
 | `queue:update` | Server → Client | Full queue snapshot | After any API mutation (add, call, complete, etc.) |
 | `queue:error` | Server → Client | `{ message }` | Failed initial sync |
 
-**Design choice:** Single broadcast event with full snapshot — simple, always consistent, no partial-state bugs across screens.
+We broadcast a full snapshot on each change. Keeps both screens in sync and avoids partial-update bugs.
 
 ## Mutation → broadcast flow
 
@@ -91,7 +91,7 @@ io.to("clinic:default").emit("queue:update", snapshot)
 }
 ```
 
-## Mermaid sequence — add patient flow
+## Mermaid: add patient
 
 ```mermaid
 sequenceDiagram

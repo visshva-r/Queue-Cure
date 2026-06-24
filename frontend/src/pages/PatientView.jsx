@@ -35,8 +35,8 @@ export default function PatientView() {
           </>
         ) : (
           <>
-            <div className="hero-token muted">—</div>
-            <p className="hero-sub">Doctor is ready — next patient will be called shortly</p>
+            <div className="hero-token muted">-</div>
+            <p className="hero-sub">Waiting for the next patient to be called</p>
           </>
         )}
       </section>
@@ -47,7 +47,7 @@ export default function PatientView() {
           <span className="stat-label">In queue</span>
         </div>
         <div className="stat">
-          <span className="stat-value">{queue?.settings?.effectiveAvgMinutes ?? '—'}</span>
+          <span className="stat-value">{queue?.settings?.effectiveAvgMinutes ?? '-'}</span>
           <span className="stat-label">Avg min / visit</span>
         </div>
         <div className="stat">
@@ -59,7 +59,7 @@ export default function PatientView() {
       <section className="card waiting-card">
         <h2>Up next</h2>
         {upNext.length === 0 ? (
-          <p className="empty">Queue is clear — you may be called any moment</p>
+          <p className="empty">No one waiting. You may be called soon.</p>
         ) : (
           <ul className="up-next-list">
             {upNext.map((p, i) => (
@@ -83,7 +83,7 @@ export default function PatientView() {
               ? `average of last ${queue.settings.rollingSampleSize} consultations`
               : 'clinic average set by reception'}
           </strong>{' '}
-          × your position in queue. Updates automatically — no refresh needed.
+          × your position in the queue. Updates on its own.
         </p>
         {queue?.serverTime && (
           <small>Last sync {formatTime(queue.serverTime)}</small>
