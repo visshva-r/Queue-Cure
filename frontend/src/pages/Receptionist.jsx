@@ -219,11 +219,6 @@ export default function Receptionist() {
           </ul>
         )}
       </section>
-
-      <p className="demo-line">
-        <strong>Demo moment:</strong> Add a patient on this screen — their token appears on the waiting
-        room display instantly, with a wait time based on real queue position and consultation data.
-      </p>
     </main>
   );
 }

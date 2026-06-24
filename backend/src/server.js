@@ -40,7 +40,7 @@ async function connectDatabase() {
     const mongod = await MongoMemoryServer.create();
     const uri = mongod.getUri('queue-cure');
     await mongoose.connect(uri);
-    console.log('Using in-memory MongoDB (demo mode — data resets on restart)');
+    console.log('Using in-memory MongoDB (local development — data resets on restart)');
     return;
   }
 
@@ -48,7 +48,7 @@ async function connectDatabase() {
     await mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 4000 });
     console.log('Connected to MongoDB');
   } catch (err) {
-    console.warn('MongoDB unavailable, falling back to in-memory database for demo');
+    console.warn('MongoDB unavailable, falling back to in-memory database');
     const { MongoMemoryServer } = require('mongodb-memory-server');
     const mongod = await MongoMemoryServer.create();
     const uri = mongod.getUri('queue-cure');

@@ -1,53 +1,45 @@
-# Queue Cure '26 — Live Clinic Queue System
+# Queue Cure — Live Clinic Queue System
 
-Replace paper token slips with a real-time digital waiting room. Built for the Wooble **Queue Cure '26** hackathon.
+Replace paper token slips with a real-time digital waiting room for neighbourhood clinics. Receptionists manage the queue on one screen; patients follow along on their phone or a waiting-room display — no refresh required.
 
-> All application code lives in this `Project/` folder. The hackathon brief (`Hackathon details.txt`) stays in the parent workspace root.
+## Features
 
-## The three answers judges care about
+| Capability | How it works |
+|------------|--------------|
+| Fast check-in | One field, one click (or Enter). Tokens auto-increment. |
+| Live updates | Socket.io pushes `queue:update` to all connected clients instantly. |
+| Smart wait times | `patientsAhead × effectiveAvgMinutes` — rolling average of the last 20 completed visits, with a receptionist-set fallback until enough data exists. |
 
-| Question | How Queue Cure answers it |
-|----------|---------------------------|
-| Add a patient in under 10 seconds? | **Yes** — one field, one click (or Enter). Token auto-increments. |
-| Patient screen updates live? | **Yes** — Socket.io pushes `queue:update` to all clients instantly. |
-| Wait time from real data? | **Yes** — `patientsAhead × effectiveAvgMinutes`, where avg comes from a **rolling average of completed consultations** (last 20), falling back to receptionist-set baseline. |
+## Screens
 
-## Demo moment (one sentence)
+- **Reception** (`/`) — add patients, call next, complete visits, set average consultation time
+- **Waiting room** (`/waiting`) — current token, queue position, estimated wait
 
-> *"Add 'Ravi' on the reception screen — within a second his token #4 appears on the waiting room TV with '~24 min' computed from queue position and today's actual consultation times, and when you hit Call Next both screens flip without anyone refreshing."*
-
-## Live demo
-
-- **Receptionist:** `/` — add patients, call next, complete visits, set avg time  
-- **Waiting room:** `/waiting` — large "now serving" display + up-next list with live wait estimates  
-
-Open both routes in two browser tabs to see real-time sync.
+Open both routes in two browser tabs to see real-time sync in action.
 
 ## Tech stack
 
 - **Backend:** Node.js, Express, Socket.io, MongoDB (Mongoose)
 - **Frontend:** React, Vite, Socket.io client
-- **Why this stack:** Matches hackathon skill signals (Express + MongoDB), gives reliable real-time sync, and persists queue state across refreshes.
+
+Express and MongoDB provide reliable real-time sync with persistent queue state across refreshes and restarts.
 
 ## Quick start
 
 ### Prerequisites
 
 - Node.js 18+
-- MongoDB (optional) — local Docker, [MongoDB Atlas](https://www.mongodb.com/atlas), or **in-memory demo mode** (enabled by default in `.env`)
+- MongoDB (optional) — local Docker, [MongoDB Atlas](https://www.mongodb.com/atlas), or in-memory mode for local development
 
-### Quick demo (no MongoDB install)
-
-From the `Project/` folder:
+### Local development (no MongoDB install)
 
 ```bash
-cd Project   # if you're at the workspace root
 cd backend
 npm install
 npm run dev
 ```
 
-`USE_MEMORY_DB=true` in `backend/.env` starts an embedded MongoDB for demos. For production/hackathon judging, use real MongoDB Atlas and set `USE_MEMORY_DB=false`.
+`USE_MEMORY_DB=true` in `backend/.env` uses an embedded MongoDB for local runs. For production, use MongoDB Atlas and set `USE_MEMORY_DB=false`.
 
 ### Full setup with Docker MongoDB
 
@@ -55,7 +47,7 @@ npm run dev
 docker compose up -d
 ```
 
-### 2. Backend
+### Backend
 
 ```bash
 cd backend
@@ -66,7 +58,7 @@ npm run dev
 
 API: `http://localhost:3001`
 
-### 3. Frontend
+### Frontend
 
 ```bash
 cd frontend
@@ -76,19 +68,29 @@ npm run dev
 
 App: `http://localhost:5173`
 
+### Automated tests
+
+With the backend running:
+
+```bash
+npm test
+```
+
+Runs API and live socket sync smoke tests against `http://localhost:3001`.
+
 ## Project structure
 
 ```
-Queue Cure '26/
-├── Hackathon details.txt    # hackathon brief (workspace root)
-└── Project/
-    ├── backend/             Express API + Socket.io + MongoDB
-    ├── frontend/            React — Reception + Waiting Room views
-    ├── docs/
-    │   ├── SOCKET_DIAGRAM.md
-    │   └── THOUGHT_PROCESS.md
-    ├── docker-compose.yml
-    └── README.md
+queue-cure/
+├── backend/             Express API + Socket.io + MongoDB
+├── frontend/            React — Reception + Waiting Room views
+├── docs/
+│   ├── SOCKET_DIAGRAM.md
+│   └── ARCHITECTURE.md
+├── scripts/
+│   └── smoke-test.mjs
+├── docker-compose.yml
+└── README.md
 ```
 
 ## API overview
@@ -105,13 +107,11 @@ Queue Cure '26/
 
 Every mutating endpoint broadcasts `queue:update` via WebSocket.
 
-## Submission checklist (Wooble)
+## Documentation
 
-- [ ] Live prototype URL or demo video
-- [ ] This GitHub repo + README
-- [ ] [Socket event diagram](docs/SOCKET_DIAGRAM.md)
-- [ ] [Thought process sheet](docs/THOUGHT_PROCESS.md)
+- [Socket event diagram](docs/SOCKET_DIAGRAM.md) — real-time sync architecture
+- [Architecture & design notes](docs/ARCHITECTURE.md) — wait-time logic, concurrency, edge cases
 
-## Author
+## License
 
-Built for Queue Cure '26 — Full Stack hackathon.
+MIT

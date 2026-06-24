@@ -92,7 +92,7 @@ async function testCallNextAndComplete() {
 }
 
 async function testLiveSocket() {
-  console.log('\n5. Live socket sync (hackathon criteria #1)');
+  console.log('\n5. Live socket sync');
 
   return new Promise((resolve) => {
     const timeout = setTimeout(() => {

@@ -91,7 +91,7 @@ io.to("clinic:default").emit("queue:update", snapshot)
 }
 ```
 
-## Mermaid sequence — add patient demo
+## Mermaid sequence — add patient flow
 
 ```mermaid
 sequenceDiagram

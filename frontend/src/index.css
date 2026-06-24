@@ -398,15 +398,6 @@ input:focus {
   }
 }
 
-.demo-line {
-  font-size: 0.9rem;
-  color: var(--muted);
-  background: var(--accent);
-  padding: 1rem 1.25rem;
-  border-radius: var(--radius);
-  border: 1px dashed #9fd4c4;
-}
-
 /* Waiting room */
 .waiting-room {
   min-height: 100vh;
