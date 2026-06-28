@@ -36,7 +36,7 @@ const consultationRecordSchema = new mongoose.Schema(
   {
     clinicId: { type: String, default: 'default', index: true },
     tokenNumber: { type: Number, required: true },
-    durationMinutes: { type: Number, required: true, min: 0.5 },
+    durationMinutes: { type: Number, required: true, min: 0 },
     recordedAt: { type: Date, default: Date.now },
   },
   { timestamps: true }

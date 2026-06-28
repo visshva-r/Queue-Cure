@@ -17,20 +17,23 @@ async function getRollingAverageMinutes() {
     .limit(ROLLING_WINDOW)
     .lean();
 
-  if (records.length === 0) return null;
+  if (records.length === 0) return { avg: null, sampleSize: 0 };
 
   const total = records.reduce((sum, r) => sum + r.durationMinutes, 0);
-  return Math.round((total / records.length) * 10) / 10;
+  return {
+    avg: Math.round((total / records.length) * 10) / 10,
+    sampleSize: records.length,
+  };
 }
 
 async function getEffectiveAvgMinutes(settings) {
   const rolling = await getRollingAverageMinutes();
-  if (rolling !== null) return rolling;
-  return settings.avgConsultationMinutes;
+  if (rolling.avg !== null) return rolling;
+  return { avg: settings.avgConsultationMinutes, sampleSize: 0 };
 }
 
 function minutesBetween(start, end) {
-  return Math.max(0.5, Math.round(((end - start) / 60000) * 10) / 10);
+  return Math.round(((end - start) / 60000) * 10) / 10;
 }
 
 async function buildQueueSnapshot() {
@@ -46,9 +49,7 @@ async function buildQueueSnapshot() {
     }),
   ]);
 
-  const avgMinutes = await getEffectiveAvgMinutes(settings);
-  const rollingSampleSize = await ConsultationRecord.countDocuments({ clinicId: CLINIC_ID });
-  const rollingCount = Math.min(rollingSampleSize, ROLLING_WINDOW);
+  const { avg: avgMinutes, sampleSize: rollingCount } = await getEffectiveAvgMinutes(settings);
 
   const currentToken = inConsultation?.tokenNumber ?? null;
   const currentPatientName = inConsultation?.name ?? null;
@@ -97,17 +98,20 @@ async function addPatient(name) {
     throw Object.assign(new Error('Patient name is required'), { status: 400 });
   }
 
-  const settings = await getOrCreateSettings();
+  const settings = await ClinicSettings.findOneAndUpdate(
+    { clinicId: CLINIC_ID },
+    { $inc: { nextTokenNumber: 1 } },
+    { new: false, upsert: true }
+  );
+
+  const tokenNumber = settings?.nextTokenNumber ?? 1;
 
   const patient = await Patient.create({
     clinicId: CLINIC_ID,
-    tokenNumber: settings.nextTokenNumber,
+    tokenNumber,
     name: trimmed,
     status: 'waiting',
   });
-
-  settings.nextTokenNumber += 1;
-  await settings.save();
 
   return patient;
 }
@@ -157,7 +161,7 @@ async function completeCurrent() {
   current.consultationDurationMinutes = durationMinutes;
   await current.save();
 
-  if (durationMinutes) {
+  if (durationMinutes !== null) {
     await ConsultationRecord.create({
       clinicId: CLINIC_ID,
       tokenNumber: current.tokenNumber,
@@ -218,6 +222,9 @@ async function resetDayQueue() {
     { clinicId: CLINIC_ID, status: { $in: ['waiting', 'in_consultation'] } },
     { $set: { status: 'no_show', completedAt: new Date() } }
   );
+
+  // ConsultationRecord is intentionally NOT cleared on reset.
+  // Historical durations persist across days to maintain rolling average accuracy.
 
   const settings = await getOrCreateSettings();
   settings.nextTokenNumber = 1;

@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const queueService = require('../services/queueService');
 
 function createApiRouter(broadcast) {
@@ -74,6 +75,9 @@ function createApiRouter(broadcast) {
   });
 
   router.delete('/patients/:id', (req, res) => {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid patient id' });
+    }
     mutate(res, async () => {
       const patient = await queueService.removeFromQueue(req.params.id);
       return { id: patient._id.toString(), tokenNumber: patient.tokenNumber };

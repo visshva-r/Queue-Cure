@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { useQueueSocket } from '../hooks/useQueueSocket';
 import { api } from '../api';
+import { formatWait } from '../utils/formatWait';
 
 export default function Receptionist() {
-  const { queue, connected, error } = useQueueSocket();
+  const { queue, connected, reconnecting, error } = useQueueSocket();
   const [name, setName] = useState('');
   const [avgInput, setAvgInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -55,9 +56,14 @@ export default function Receptionist() {
   }
 
   async function handleComplete() {
-    const result = await runAction(() => api.complete(), 'Consultation completed');
-    if (result?.consultationDurationMinutes) {
-      showToast(`Recorded ${result.consultationDurationMinutes} min. Average will update.`);
+    const result = await runAction(() => api.complete());
+    if (result) {
+      let msg = 'Consultation completed';
+      if (result.consultationDurationMinutes != null) {
+        const d = result.consultationDurationMinutes;
+        msg = d < 1 ? 'Done — recorded < 1 min' : `Done — recorded ${d} min`;
+      }
+      showToast(msg);
     }
   }
 
@@ -65,7 +71,8 @@ export default function Receptionist() {
     await runAction(() => api.noShow(), 'Marked as no-show');
   }
 
-  async function handleRemove(id) {
+  async function handleRemove(id, patientName) {
+    if (!window.confirm(`Remove ${patientName} from the queue?`)) return;
     await runAction(() => api.removePatient(id), 'Removed from queue');
   }
 
@@ -100,8 +107,8 @@ export default function Receptionist() {
   return (
     <main className="reception">
       <div className="status-row">
-        <span className={`pill ${connected ? 'live' : 'offline'}`}>
-          {connected ? '● Live' : '○ Offline'}
+        <span className={`pill ${connected ? 'live' : reconnecting ? 'reconnecting' : 'offline'}`}>
+          {connected ? '● Live' : reconnecting ? '○ Reconnecting…' : '○ Offline'}
         </span>
         {queue?.settings && (
           <span className="meta">
@@ -171,6 +178,9 @@ export default function Receptionist() {
           <div className="now-empty">-</div>
         )}
         {hasCurrent && <p className="now-name">{queue.currentPatientName}</p>}
+        {hasCurrent && queue.elapsedInCurrentMinutes > 0 && (
+          <p className="elapsed">In progress: {formatWait(queue.elapsedInCurrentMinutes)}</p>
+        )}
         <div className="action-row">
           <button
             className="btn call-next"
@@ -205,12 +215,13 @@ export default function Receptionist() {
               <li key={p.id}>
                 <span className="token-badge">#{p.tokenNumber}</span>
                 <span className="patient-name">{p.name}</span>
-                <span className="wait-est">~{p.estimatedWaitMinutes} min</span>
+                <span className="wait-est">{formatWait(p.estimatedWaitMinutes)}</span>
                 <button
                   className="btn icon"
-                  onClick={() => handleRemove(p.id)}
+                  onClick={() => handleRemove(p.id, p.name)}
                   disabled={busy}
                   title="Remove from queue"
+                  aria-label={`Remove ${p.name} from queue`}
                 >
                   ×
                 </button>

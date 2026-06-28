@@ -1,14 +1,16 @@
 import { useMemo } from 'react';
 import { useQueueSocket } from '../hooks/useQueueSocket';
+import { formatWait } from '../utils/formatWait';
 
 function formatTime(iso) {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 export default function PatientView() {
-  const { queue, connected, error } = useQueueSocket();
+  const { queue, connected, reconnecting, error } = useQueueSocket();
 
   const upNext = useMemo(() => queue?.waiting?.slice(0, 5) ?? [], [queue?.waiting]);
+  const remainingCount = Math.max(0, (queue?.waitingCount ?? 0) - upNext.length);
 
   return (
     <main className="waiting-room">
@@ -17,8 +19,8 @@ export default function PatientView() {
           <p className="clinic-name">Neighbourhood Clinic</p>
           <h1>Waiting room</h1>
         </div>
-        <span className={`pill ${connected ? 'live' : 'offline'}`}>
-          {connected ? '● Live updates' : '○ Reconnecting…'}
+        <span className={`pill ${connected ? 'live' : reconnecting ? 'reconnecting' : 'offline'}`}>
+          {connected ? '● Live updates' : reconnecting ? '○ Reconnecting…' : '○ Offline'}
         </span>
       </header>
 
@@ -32,6 +34,11 @@ export default function PatientView() {
               {queue.currentToken}
             </div>
             <p className="hero-sub">Please proceed to the consultation room</p>
+            {queue.elapsedInCurrentMinutes > 0 && (
+              <p className="hero-elapsed">
+                Consultation in progress: {formatWait(queue.elapsedInCurrentMinutes)}
+              </p>
+            )}
           </>
         ) : (
           <>
@@ -61,17 +68,22 @@ export default function PatientView() {
         {upNext.length === 0 ? (
           <p className="empty">No one waiting. You may be called soon.</p>
         ) : (
-          <ul className="up-next-list">
-            {upNext.map((p, i) => (
-              <li key={p.id} className={i === 0 ? 'next-up' : ''}>
-                <span className="up-token">#{p.tokenNumber}</span>
-                <span className="up-position">
-                  {i === 0 ? 'Next' : `${p.patientsAhead} ahead`}
-                </span>
-                <span className="up-wait">~{p.estimatedWaitMinutes} min wait</span>
-              </li>
-            ))}
-          </ul>
+          <>
+            <ul className="up-next-list">
+              {upNext.map((p, i) => (
+                <li key={p.id} className={i === 0 ? 'next-up' : ''}>
+                  <span className="up-token">#{p.tokenNumber}</span>
+                  <span className="up-position">
+                    {i === 0 ? 'Next' : `${p.patientsAhead} ahead`}
+                  </span>
+                  <span className="up-wait">{formatWait(p.estimatedWaitMinutes)} wait</span>
+                </li>
+              ))}
+            </ul>
+            {remainingCount > 0 && (
+              <p className="more-waiting">+{remainingCount} more in queue</p>
+            )}
+          </>
         )}
       </section>
 
