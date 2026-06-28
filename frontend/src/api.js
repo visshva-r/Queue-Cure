@@ -16,6 +16,7 @@ export const api = {
   complete: () => request('/queue/complete', { method: 'POST' }),
   noShow: () => request('/queue/no-show', { method: 'POST' }),
   removePatient: (id) => request(`/patients/${id}`, { method: 'DELETE' }),
+  restorePatient: (id) => request(`/patients/${id}/restore`, { method: 'POST' }),
   setAvgMinutes: (avgConsultationMinutes) =>
     request('/settings/avg-consultation', {
       method: 'PATCH',

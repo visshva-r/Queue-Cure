@@ -1,6 +1,15 @@
 const express = require('express');
 const mongoose = require('mongoose');
+const rateLimit = require('express-rate-limit');
 const queueService = require('../services/queueService');
+
+const patientAddLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  message: { error: 'Too many check-ins. Please wait a moment.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 function createApiRouter(broadcast) {
   const router = express.Router();
@@ -29,7 +38,7 @@ function createApiRouter(broadcast) {
     }
   });
 
-  router.post('/patients', (req, res) => {
+  router.post('/patients', patientAddLimiter, (req, res) => {
     mutate(
       res,
       async () => {
@@ -80,7 +89,25 @@ function createApiRouter(broadcast) {
     }
     mutate(res, async () => {
       const patient = await queueService.removeFromQueue(req.params.id);
-      return { id: patient._id.toString(), tokenNumber: patient.tokenNumber };
+      return {
+        id: patient._id.toString(),
+        tokenNumber: patient.tokenNumber,
+        name: patient.name,
+      };
+    });
+  });
+
+  router.post('/patients/:id/restore', (req, res) => {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid patient id' });
+    }
+    mutate(res, async () => {
+      const patient = await queueService.restoreToQueue(req.params.id);
+      return {
+        id: patient._id.toString(),
+        tokenNumber: patient.tokenNumber,
+        name: patient.name,
+      };
     });
   });
 

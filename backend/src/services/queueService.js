@@ -3,12 +3,35 @@ const { ClinicSettings, Patient, ConsultationRecord } = require('../models');
 const CLINIC_ID = 'default';
 const ROLLING_WINDOW = 20;
 
+function startOfToday() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
 async function getOrCreateSettings() {
   let settings = await ClinicSettings.findOne({ clinicId: CLINIC_ID });
   if (!settings) {
     settings = await ClinicSettings.create({ clinicId: CLINIC_ID });
   }
   return settings;
+}
+
+async function syncTokenCounter() {
+  const settings = await getOrCreateSettings();
+  const latestToday = await Patient.findOne({
+    clinicId: CLINIC_ID,
+    joinedAt: { $gte: startOfToday() },
+  })
+    .sort({ tokenNumber: -1 })
+    .select('tokenNumber')
+    .lean();
+
+  if (latestToday && latestToday.tokenNumber >= settings.nextTokenNumber) {
+    settings.nextTokenNumber = latestToday.tokenNumber + 1;
+    await settings.save();
+    console.log(`Token counter synced to #${settings.nextTokenNumber}`);
+  }
 }
 
 async function getRollingAverageMinutes() {
@@ -38,6 +61,7 @@ function minutesBetween(start, end) {
 
 async function buildQueueSnapshot() {
   const settings = await getOrCreateSettings();
+  const now = Date.now();
 
   const [waiting, inConsultation, completedToday] = await Promise.all([
     Patient.find({ clinicId: CLINIC_ID, status: 'waiting' }).sort({ tokenNumber: 1 }).lean(),
@@ -45,7 +69,7 @@ async function buildQueueSnapshot() {
     Patient.countDocuments({
       clinicId: CLINIC_ID,
       status: 'completed',
-      completedAt: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) },
+      completedAt: { $gte: startOfToday() },
     }),
   ]);
 
@@ -53,6 +77,7 @@ async function buildQueueSnapshot() {
 
   const currentToken = inConsultation?.tokenNumber ?? null;
   const currentPatientName = inConsultation?.name ?? null;
+  const currentCalledAt = inConsultation?.calledAt?.toISOString?.() ?? inConsultation?.calledAt ?? null;
 
   let elapsedInCurrent = 0;
   if (inConsultation?.calledAt) {
@@ -70,6 +95,7 @@ async function buildQueueSnapshot() {
       position: index + 1,
       patientsAhead,
       estimatedWaitMinutes,
+      estimatedCallAt: new Date(now + estimatedWaitMinutes * 60000).toISOString(),
     };
   });
 
@@ -77,6 +103,7 @@ async function buildQueueSnapshot() {
     clinicId: CLINIC_ID,
     currentToken,
     currentPatientName,
+    currentCalledAt,
     elapsedInCurrentMinutes: elapsedInCurrent,
     waiting: waitingWithEstimates,
     waitingCount: waiting.length,
@@ -199,8 +226,25 @@ async function removeFromQueue(patientId) {
     throw Object.assign(new Error('Patient not found in waiting queue'), { status: 404 });
   }
 
-  patient.status = 'no_show';
+  patient.status = 'cancelled';
   patient.completedAt = new Date();
+  await patient.save();
+  return patient;
+}
+
+async function restoreToQueue(patientId) {
+  const patient = await Patient.findOne({
+    _id: patientId,
+    clinicId: CLINIC_ID,
+    status: 'cancelled',
+  });
+
+  if (!patient) {
+    throw Object.assign(new Error('Patient cannot be restored'), { status: 404 });
+  }
+
+  patient.status = 'waiting';
+  patient.completedAt = undefined;
   await patient.save();
   return patient;
 }
@@ -219,7 +263,11 @@ async function updateAvgConsultationMinutes(minutes) {
 
 async function resetDayQueue() {
   await Patient.updateMany(
-    { clinicId: CLINIC_ID, status: { $in: ['waiting', 'in_consultation'] } },
+    { clinicId: CLINIC_ID, status: 'waiting' },
+    { $set: { status: 'cancelled', completedAt: new Date() } }
+  );
+  await Patient.updateMany(
+    { clinicId: CLINIC_ID, status: 'in_consultation' },
     { $set: { status: 'no_show', completedAt: new Date() } }
   );
 
@@ -240,6 +288,8 @@ module.exports = {
   completeCurrent,
   markNoShow,
   removeFromQueue,
+  restoreToQueue,
   updateAvgConsultationMinutes,
   resetDayQueue,
+  syncTokenCounter,
 };

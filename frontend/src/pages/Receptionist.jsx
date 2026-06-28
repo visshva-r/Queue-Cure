@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useQueueSocket } from '../hooks/useQueueSocket';
+import { useLiveElapsed } from '../hooks/useLiveElapsed';
 import { api } from '../api';
 import { formatWait } from '../utils/formatWait';
 
@@ -11,6 +12,14 @@ export default function Receptionist() {
   const [toast, setToast] = useState(null);
   const [lastToken, setLastToken] = useState(null);
   const nameRef = useRef(null);
+  const toastTimerRef = useRef(null);
+
+  const hasCurrent = queue?.currentToken != null;
+  const liveElapsed = useLiveElapsed(
+    queue?.currentCalledAt,
+    queue?.elapsedInCurrentMinutes,
+    hasCurrent
+  );
 
   useEffect(() => {
     if (queue?.settings?.avgConsultationMinutes != null) {
@@ -22,9 +31,18 @@ export default function Receptionist() {
     nameRef.current?.focus();
   }, []);
 
-  function showToast(message, type = 'success') {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 2800);
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
+
+  function showToast(message, type = 'success', options = {}) {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ message, type, ...options });
+    if (!options.onUndo) {
+      toastTimerRef.current = setTimeout(() => setToast(null), 2800);
+    }
   }
 
   async function runAction(action, successMsg) {
@@ -68,12 +86,30 @@ export default function Receptionist() {
   }
 
   async function handleNoShow() {
+    if (!window.confirm('Mark current patient as no-show?')) return;
     await runAction(() => api.noShow(), 'Marked as no-show');
   }
 
   async function handleRemove(id, patientName) {
     if (!window.confirm(`Remove ${patientName} from the queue?`)) return;
-    await runAction(() => api.removePatient(id), 'Removed from queue');
+    const result = await runAction(() => api.removePatient(id));
+    if (result) {
+      showToast(`Removed ${patientName}`, 'success', {
+        onUndo: async () => {
+          try {
+            setBusy(true);
+            await api.restorePatient(result.id);
+            setToast(null);
+            showToast(`${patientName} restored to queue`);
+          } catch (err) {
+            showToast(err.message, 'error');
+          } finally {
+            setBusy(false);
+          }
+        },
+      });
+      toastTimerRef.current = setTimeout(() => setToast(null), 5000);
+    }
   }
 
   async function handleAvgSave(e) {
@@ -89,7 +125,6 @@ export default function Receptionist() {
     await runAction(() => api.resetDay(), 'Queue reset for new day');
   }
 
-  const hasCurrent = queue?.currentToken != null;
   const nextWaiting = queue?.waiting?.[0];
 
   useEffect(() => {
@@ -122,7 +157,16 @@ export default function Receptionist() {
       </div>
 
       {error && <div className="banner error">{error}</div>}
-      {toast && <div className={`toast ${toast.type}`}>{toast.message}</div>}
+      {toast && (
+        <div className={`toast ${toast.type}`}>
+          <span>{toast.message}</span>
+          {toast.onUndo && (
+            <button type="button" className="toast-undo" onClick={toast.onUndo}>
+              Undo
+            </button>
+          )}
+        </div>
+      )}
 
       <section className="grid-2">
         <div className="card highlight">
@@ -178,8 +222,8 @@ export default function Receptionist() {
           <div className="now-empty">-</div>
         )}
         {hasCurrent && <p className="now-name">{queue.currentPatientName}</p>}
-        {hasCurrent && queue.elapsedInCurrentMinutes > 0 && (
-          <p className="elapsed">In progress: {formatWait(queue.elapsedInCurrentMinutes)}</p>
+        {hasCurrent && (
+          <p className="elapsed">In progress: {formatWait(liveElapsed)}</p>
         )}
         <div className="action-row">
           <button
@@ -191,10 +235,12 @@ export default function Receptionist() {
             Call next
             {nextWaiting && <small>#{nextWaiting.tokenNumber}</small>}
           </button>
+        </div>
+        <div className="consult-actions">
           <button className="btn success" onClick={handleComplete} disabled={busy || !hasCurrent}>
             Done
           </button>
-          <button className="btn ghost" onClick={handleNoShow} disabled={busy || !hasCurrent}>
+          <button className="btn danger" onClick={handleNoShow} disabled={busy || !hasCurrent}>
             No-show
           </button>
         </div>

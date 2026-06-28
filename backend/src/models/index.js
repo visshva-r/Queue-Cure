@@ -17,7 +17,7 @@ const patientSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true, maxlength: 80 },
     status: {
       type: String,
-      enum: ['waiting', 'in_consultation', 'completed', 'no_show'],
+      enum: ['waiting', 'in_consultation', 'completed', 'no_show', 'cancelled'],
       default: 'waiting',
       index: true,
     },

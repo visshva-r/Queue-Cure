@@ -233,6 +233,16 @@ input:focus {
   color: white;
 }
 
+.btn.danger {
+  background: #fff;
+  color: var(--danger);
+  border: 2px solid var(--danger);
+}
+
+.btn.danger:disabled {
+  opacity: 0.45;
+}
+
 .btn.ghost {
   background: transparent;
   border: 1px solid var(--border);
@@ -326,6 +336,15 @@ input:focus {
   flex-wrap: wrap;
   gap: 0.5rem;
   justify-content: center;
+  margin-bottom: 0.75rem;
+}
+
+.consult-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
 }
 
 .section-head {
@@ -390,6 +409,20 @@ input:focus {
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
   z-index: 100;
   animation: slideIn 0.25s ease;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.toast-undo {
+  background: rgba(255, 255, 255, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  color: inherit;
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .toast.success {
@@ -544,6 +577,19 @@ input:focus {
   padding: 0.85rem 0;
   border-bottom: 1px solid var(--border);
   align-items: center;
+}
+
+.up-wait-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+}
+
+.up-call-time {
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-weight: 500;
 }
 
 .up-next-list li.next-up {

@@ -3,10 +3,12 @@ const http = require('http');
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const rateLimit = require('express-rate-limit');
 const { Server } = require('socket.io');
 
 const createApiRouter = require('./routes/api');
 const { setupSocket, broadcastQueueUpdate } = require('./socket');
+const { syncTokenCounter } = require('./services/queueService');
 
 const PORT = process.env.PORT || 3001;
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/queue-cure';
@@ -30,8 +32,15 @@ app.get('/health', (req, res) => {
   res.json({ ok: true, service: 'queue-cure-api' });
 });
 
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 const broadcast = () => broadcastQueueUpdate(io);
-app.use('/api', createApiRouter(broadcast));
+app.use('/api', apiLimiter, createApiRouter(broadcast));
 setupSocket(io);
 
 async function connectDatabase() {
@@ -59,6 +68,7 @@ async function connectDatabase() {
 
 async function start() {
   await connectDatabase();
+  await syncTokenCounter();
 
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {

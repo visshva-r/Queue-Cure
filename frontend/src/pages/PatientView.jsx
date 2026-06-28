@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useQueueSocket } from '../hooks/useQueueSocket';
-import { formatWait } from '../utils/formatWait';
+import { useLiveElapsed } from '../hooks/useLiveElapsed';
+import { formatWait, formatClockTime } from '../utils/formatWait';
 
 function formatTime(iso) {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -8,6 +9,13 @@ function formatTime(iso) {
 
 export default function PatientView() {
   const { queue, connected, reconnecting, error } = useQueueSocket();
+
+  const hasCurrent = queue?.currentToken != null;
+  const liveElapsed = useLiveElapsed(
+    queue?.currentCalledAt,
+    queue?.elapsedInCurrentMinutes,
+    hasCurrent
+  );
 
   const upNext = useMemo(() => queue?.waiting?.slice(0, 5) ?? [], [queue?.waiting]);
   const remainingCount = Math.max(0, (queue?.waitingCount ?? 0) - upNext.length);
@@ -28,17 +36,15 @@ export default function PatientView() {
 
       <section className="hero-card">
         <p className="hero-label">Now being seen</p>
-        {queue?.currentToken != null ? (
+        {hasCurrent ? (
           <>
             <div className="hero-token" key={queue.currentToken}>
               {queue.currentToken}
             </div>
             <p className="hero-sub">Please proceed to the consultation room</p>
-            {queue.elapsedInCurrentMinutes > 0 && (
-              <p className="hero-elapsed">
-                Consultation in progress: {formatWait(queue.elapsedInCurrentMinutes)}
-              </p>
-            )}
+            <p className="hero-elapsed">
+              Consultation in progress: {formatWait(liveElapsed)}
+            </p>
           </>
         ) : (
           <>
@@ -74,9 +80,14 @@ export default function PatientView() {
                 <li key={p.id} className={i === 0 ? 'next-up' : ''}>
                   <span className="up-token">#{p.tokenNumber}</span>
                   <span className="up-position">
-                    {i === 0 ? 'Next' : `${p.patientsAhead} ahead`}
+                    {i === 0 && !hasCurrent ? 'Next' : i === 0 ? 'Next' : `${p.patientsAhead} ahead`}
                   </span>
-                  <span className="up-wait">{formatWait(p.estimatedWaitMinutes)} wait</span>
+                  <span className="up-wait-col">
+                    <span className="up-wait">{formatWait(p.estimatedWaitMinutes)} wait</span>
+                    {p.estimatedCallAt && (
+                      <span className="up-call-time">~{formatClockTime(p.estimatedCallAt)}</span>
+                    )}
+                  </span>
                 </li>
               ))}
             </ul>

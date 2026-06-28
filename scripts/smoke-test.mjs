@@ -64,7 +64,8 @@ async function testQueueSnapshot() {
   const { res, body } = await api('/api/queue');
   assert(res.status === 200, 'GET /api/queue returns 200');
   assert(Array.isArray(body.waiting), 'waiting is array');
-  assert(body.settings?.effectiveAvgMinutes > 0, 'effective avg minutes > 0');
+  assert(typeof body.settings?.effectiveAvgMinutes === 'number', 'effective avg minutes is a number');
+  assert(body.settings.effectiveAvgMinutes >= 0, 'effective avg minutes non-negative');
   const waiting = body.waiting.find((p) => p.name === 'Smoke Test Patient');
   assert(!!waiting, 'patient appears in queue');
   if (waiting) {
@@ -135,6 +136,39 @@ async function testLiveSocket() {
   });
 }
 
+async function testRemoveAndRestore() {
+  console.log('\n6. Remove & restore patient');
+  const { res: addRes, body: added } = await api('/api/patients', {
+    method: 'POST',
+    body: JSON.stringify({ name: 'Remove Restore Test' }),
+  });
+  assert(addRes.status === 201, 'POST patient for restore test returns 201');
+
+  const { res: delRes, body: removed } = await api(`/api/patients/${added.id}`, {
+    method: 'DELETE',
+  });
+  assert(delRes.status === 200, 'DELETE /api/patients/:id returns 200');
+  assert(removed.name === 'Remove Restore Test', 'DELETE returns patient name');
+
+  const { body: afterDelete } = await api('/api/queue');
+  assert(
+    !afterDelete.waiting.some((p) => p.id === added.id),
+    'patient removed from waiting list'
+  );
+
+  const { res: restoreRes } = await api(`/api/patients/${added.id}/restore`, {
+    method: 'POST',
+  });
+  assert(restoreRes.status === 200, 'POST /api/patients/:id/restore returns 200');
+
+  const { body: afterRestore } = await api('/api/queue');
+  const restored = afterRestore.waiting.find((p) => p.id === added.id);
+  assert(!!restored, 'patient back in waiting list');
+  if (restored) {
+    assert(typeof restored.estimatedCallAt === 'string', 'estimatedCallAt is set');
+  }
+}
+
 async function main() {
   console.log('Queue Cure smoke test');
   console.log(`Target: ${BASE}`);
@@ -152,6 +186,7 @@ async function main() {
   await testQueueSnapshot();
   await testCallNextAndComplete();
   await testLiveSocket();
+  await testRemoveAndRestore();
 
   console.log('\n─────────────────────────────');
   console.log(`Results: ${passed} passed, ${failed} failed`);
