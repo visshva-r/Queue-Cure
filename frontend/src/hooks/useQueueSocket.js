@@ -22,17 +22,27 @@ function getSharedSocket() {
 
 function releaseSharedSocket() {
   socketRefCount -= 1;
-  if (socketRefCount <= 0 && sharedSocket) {
+  if (socketRefCount < 0) socketRefCount = 0;
+  // Keep the socket open when switching routes (/ <-> /waiting) in the same tab.
+}
+
+function teardownSharedSocket() {
+  if (sharedSocket) {
     sharedSocket.disconnect();
     sharedSocket = null;
-    socketRefCount = 0;
   }
+  socketRefCount = 0;
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', teardownSharedSocket);
 }
 
 export function useQueueSocket() {
   const [queue, setQueue] = useState(null);
   const [connected, setConnected] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
+  const [ready, setReady] = useState(false);
   const [error, setError] = useState(null);
 
   const refresh = useCallback(async () => {
@@ -43,18 +53,22 @@ export function useQueueSocket() {
       const data = await res.json();
       setQueue(data);
       setError(null);
+      setReady(true);
     } catch (err) {
       setError(err.message);
     }
   }, []);
 
   useEffect(() => {
+    refresh();
+
     const socket = getSharedSocket();
 
     const onConnect = () => {
       setConnected(true);
       setReconnecting(false);
       setError(null);
+      refresh();
     };
 
     const onDisconnect = () => {
@@ -73,11 +87,13 @@ export function useQueueSocket() {
     const onQueueSync = (snapshot) => {
       setQueue(snapshot);
       setError(null);
+      setReady(true);
     };
 
     const onQueueUpdate = (snapshot) => {
       setQueue(snapshot);
       setError(null);
+      setReady(true);
     };
 
     const onQueueError = (payload) => {
@@ -106,5 +122,8 @@ export function useQueueSocket() {
     };
   }, [refresh]);
 
-  return { queue, connected, reconnecting, error, refresh };
+  const connecting = !ready && !connected && !reconnecting;
+  const syncing = ready && !connected && !reconnecting;
+
+  return { queue, connected, reconnecting, connecting, syncing, ready, error, refresh };
 }

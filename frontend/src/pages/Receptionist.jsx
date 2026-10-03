@@ -3,9 +3,11 @@ import { useQueueSocket } from '../hooks/useQueueSocket';
 import { useLiveElapsed } from '../hooks/useLiveElapsed';
 import { api } from '../api';
 import { formatWait } from '../utils/formatWait';
+import { connectionPillClass, connectionPillLabel } from '../utils/connectionStatus';
 
 export default function Receptionist() {
-  const { queue, connected, reconnecting, error } = useQueueSocket();
+  const { queue, connected, reconnecting, connecting, syncing, error } = useQueueSocket();
+  const pillState = { connected, reconnecting, connecting, syncing };
   const [name, setName] = useState('');
   const [avgInput, setAvgInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -53,6 +55,7 @@ export default function Receptionist() {
       return result;
     } catch (err) {
       showToast(err.message, 'error');
+      return null;
     } finally {
       setBusy(false);
       nameRef.current?.focus();
@@ -142,8 +145,8 @@ export default function Receptionist() {
   return (
     <main className="reception">
       <div className="status-row">
-        <span className={`pill ${connected ? 'live' : reconnecting ? 'reconnecting' : 'offline'}`}>
-          {connected ? '● Live' : reconnecting ? '○ Reconnecting…' : '○ Offline'}
+        <span className={`pill ${connectionPillClass(pillState)}`}>
+          {connectionPillLabel(pillState, '● Live')}
         </span>
         {queue?.settings && (
           <span className="meta">

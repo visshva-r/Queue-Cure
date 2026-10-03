@@ -2,13 +2,15 @@ import { useMemo } from 'react';
 import { useQueueSocket } from '../hooks/useQueueSocket';
 import { useLiveElapsed } from '../hooks/useLiveElapsed';
 import { formatWait, formatClockTime } from '../utils/formatWait';
+import { connectionPillClass, connectionPillLabel } from '../utils/connectionStatus';
 
 function formatTime(iso) {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 export default function PatientView() {
-  const { queue, connected, reconnecting, error } = useQueueSocket();
+  const { queue, connected, reconnecting, connecting, syncing, error } = useQueueSocket();
+  const pillState = { connected, reconnecting, connecting, syncing };
 
   const hasCurrent = queue?.currentToken != null;
   const liveElapsed = useLiveElapsed(
@@ -27,8 +29,8 @@ export default function PatientView() {
           <p className="clinic-name">Neighbourhood Clinic</p>
           <h1>Waiting room</h1>
         </div>
-        <span className={`pill ${connected ? 'live' : reconnecting ? 'reconnecting' : 'offline'}`}>
-          {connected ? '● Live updates' : reconnecting ? '○ Reconnecting…' : '○ Offline'}
+        <span className={`pill ${connectionPillClass(pillState)}`}>
+          {connectionPillLabel(pillState, '● Live updates')}
         </span>
       </header>
 

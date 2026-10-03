@@ -124,6 +124,11 @@ nav a:hover {
   color: var(--danger);
 }
 
+.pill.connecting {
+  background: #fef3c7;
+  color: #92400e;
+}
+
 .pill.reconnecting {
   background: #fff4e0;
   color: #b45309;
