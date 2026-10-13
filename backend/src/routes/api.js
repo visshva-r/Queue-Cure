@@ -16,7 +16,11 @@ function createApiRouter(broadcast) {
 
   function handleError(res, err) {
     const status = err.status || 500;
-    res.status(status).json({ error: err.message || 'Internal server error' });
+    if (err.name === 'ValidationError') {
+      return res.status(400).json({ error: 'Invalid request data' });
+    }
+    const message = status >= 500 ? 'Internal server error' : err.message || 'Request failed';
+    res.status(status).json({ error: message });
   }
 
   async function mutate(res, action, status = 200) {
@@ -125,6 +129,10 @@ function createApiRouter(broadcast) {
       await queueService.resetDayQueue();
       return { ok: true };
     });
+  });
+
+  router.use((req, res) => {
+    res.status(404).json({ error: 'Not found' });
   });
 
   return router;

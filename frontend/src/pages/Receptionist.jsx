@@ -6,8 +6,9 @@ import { formatWait } from '../utils/formatWait';
 import { connectionPillClass, connectionPillLabel } from '../utils/connectionStatus';
 
 export default function Receptionist() {
-  const { queue, connected, reconnecting, connecting, syncing, error } = useQueueSocket();
-  const pillState = { connected, reconnecting, connecting, syncing };
+  const { queue, connected, reconnecting, connecting, syncing, waking, ready, error } =
+    useQueueSocket();
+  const pillState = { connected, reconnecting, connecting, syncing, waking };
   const [name, setName] = useState('');
   const [avgInput, setAvgInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -159,6 +160,12 @@ export default function Receptionist() {
         {queue && <span className="meta">Completed today: {queue.completedToday}</span>}
       </div>
 
+      {waking && !ready && (
+        <div className="banner info">
+          Waking API on Render… first load after idle can take up to 30 seconds. Queue data will
+          appear automatically.
+        </div>
+      )}
       {error && <div className="banner error">{error}</div>}
       {toast && (
         <div className={`toast ${toast.type}`}>

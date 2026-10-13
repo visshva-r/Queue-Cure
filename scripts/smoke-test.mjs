@@ -169,6 +169,40 @@ async function testRemoveAndRestore() {
   }
 }
 
+async function testPatientValidation() {
+  console.log('\n7. Patient input validation');
+  const { body: before } = await api('/api/queue');
+  const nextBefore = before.settings.nextTokenNumber;
+
+  const { res: emptyRes } = await api('/api/patients', {
+    method: 'POST',
+    body: JSON.stringify({ name: '' }),
+  });
+  assert(emptyRes.status === 400, 'empty name returns 400');
+
+  const { res: numRes } = await api('/api/patients', {
+    method: 'POST',
+    body: JSON.stringify({ name: 12345 }),
+  });
+  assert(numRes.status === 400, 'numeric name returns 400');
+
+  const { res: longRes } = await api('/api/patients', {
+    method: 'POST',
+    body: JSON.stringify({ name: 'A'.repeat(500) }),
+  });
+  assert(longRes.status === 400, 'long name returns 400');
+
+  const { body: after } = await api('/api/queue');
+  assert(
+    after.settings.nextTokenNumber === nextBefore,
+    'invalid adds do not consume token numbers'
+  );
+
+  const { res: nfRes, body: nfBody } = await api('/api/does-not-exist');
+  assert(nfRes.status === 404, 'unknown API route returns 404');
+  assert(typeof nfBody.error === 'string', '404 response is JSON error');
+}
+
 async function main() {
   console.log('Queue Cure smoke test');
   console.log(`Target: ${BASE}`);
@@ -187,6 +221,7 @@ async function main() {
   await testCallNextAndComplete();
   await testLiveSocket();
   await testRemoveAndRestore();
+  await testPatientValidation();
 
   console.log('\n─────────────────────────────');
   console.log(`Results: ${passed} passed, ${failed} failed`);

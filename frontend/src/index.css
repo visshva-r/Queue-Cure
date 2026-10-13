@@ -277,11 +277,14 @@ input:focus {
 }
 
 .btn.icon {
-  padding: 0.25rem 0.5rem;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0.35rem 0.5rem;
   background: transparent;
   color: var(--muted);
-  font-size: 1.2rem;
+  font-size: 1.35rem;
   line-height: 1;
+  flex-shrink: 0;
 }
 
 .last-token {
@@ -394,6 +397,12 @@ input:focus {
 .empty {
   color: var(--muted);
   margin: 0;
+}
+
+.banner.info {
+  background: #eff6ff;
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
 }
 
 .banner.error {

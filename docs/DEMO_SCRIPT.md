@@ -7,7 +7,7 @@ Use **two browser windows** side by side (not one tab switching routes). That mi
 | Reception | https://queue-cure-visshva.vercel.app/ |
 | Waiting room | https://queue-cure-visshva.vercel.app/waiting |
 
-**Before you start:** Open the reception URL first and wait until the status pill shows **● Live** (Render free tier may take ~30s on first load after idle). Optional: ping `https://queue-cure-api-3vtt.onrender.com/health` a minute earlier.
+**Before you start:** Open reception first; if the API was idle you’ll see **Waking server…** for up to ~30s, then **● Live**. Optional: set UptimeRobot on `https://queue-cure-api-3vtt.onrender.com/health` every 5–10 min. Press **Reset day** on reception if “Seen today” or averages look like old test data.
 
 ## Script (~90 seconds)
 

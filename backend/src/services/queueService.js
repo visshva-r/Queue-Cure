@@ -2,6 +2,9 @@ const { ClinicSettings, Patient, ConsultationRecord } = require('../models');
 
 const CLINIC_ID = 'default';
 const ROLLING_WINDOW = 20;
+const MIN_ROLLING_SAMPLES = 5;
+const MIN_DURATION_FOR_AVERAGE = 2;
+const MAX_NAME_LENGTH = 80;
 
 function startOfToday() {
   const d = new Date();
@@ -35,12 +38,17 @@ async function syncTokenCounter() {
 }
 
 async function getRollingAverageMinutes() {
-  const records = await ConsultationRecord.find({ clinicId: CLINIC_ID })
+  const records = await ConsultationRecord.find({
+    clinicId: CLINIC_ID,
+    durationMinutes: { $gte: MIN_DURATION_FOR_AVERAGE },
+  })
     .sort({ recordedAt: -1 })
     .limit(ROLLING_WINDOW)
     .lean();
 
-  if (records.length === 0) return { avg: null, sampleSize: 0 };
+  if (records.length < MIN_ROLLING_SAMPLES) {
+    return { avg: null, sampleSize: records.length };
+  }
 
   const total = records.reduce((sum, r) => sum + r.durationMinutes, 0);
   return {
@@ -51,8 +59,8 @@ async function getRollingAverageMinutes() {
 
 async function getEffectiveAvgMinutes(settings) {
   const rolling = await getRollingAverageMinutes();
-  if (rolling.avg !== null) return rolling;
-  return { avg: settings.avgConsultationMinutes, sampleSize: 0 };
+  if (rolling.avg !== null && rolling.sampleSize >= MIN_ROLLING_SAMPLES) return rolling;
+  return { avg: settings.avgConsultationMinutes, sampleSize: rolling.sampleSize };
 }
 
 function minutesBetween(start, end) {
@@ -119,11 +127,25 @@ async function buildQueueSnapshot() {
   };
 }
 
-async function addPatient(name) {
-  const trimmed = name?.trim();
+function validatePatientName(name) {
+  if (typeof name !== 'string') {
+    throw Object.assign(new Error('Patient name must be text'), { status: 400 });
+  }
+  const trimmed = name.trim();
   if (!trimmed) {
     throw Object.assign(new Error('Patient name is required'), { status: 400 });
   }
+  if (trimmed.length > MAX_NAME_LENGTH) {
+    throw Object.assign(
+      new Error(`Patient name must be ${MAX_NAME_LENGTH} characters or fewer`),
+      { status: 400 }
+    );
+  }
+  return trimmed;
+}
+
+async function addPatient(name) {
+  const trimmed = validatePatientName(name);
 
   const settings = await ClinicSettings.findOneAndUpdate(
     { clinicId: CLINIC_ID },
@@ -188,7 +210,7 @@ async function completeCurrent() {
   current.consultationDurationMinutes = durationMinutes;
   await current.save();
 
-  if (durationMinutes !== null) {
+  if (durationMinutes !== null && durationMinutes >= MIN_DURATION_FOR_AVERAGE) {
     await ConsultationRecord.create({
       clinicId: CLINIC_ID,
       tokenNumber: current.tokenNumber,

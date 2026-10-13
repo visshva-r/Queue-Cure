@@ -1,8 +1,10 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { io } from 'socket.io-client';
 
 // Empty string uses page origin when frontend is proxied locally; production sets VITE_API_URL
 const SOCKET_URL = import.meta.env.VITE_API_URL || '';
+const API_TIMEOUT_MS = 45000;
+const WAKE_RETRY_MS = 5000;
 
 let sharedSocket = null;
 let socketRefCount = 0;
@@ -23,7 +25,6 @@ function getSharedSocket() {
 function releaseSharedSocket() {
   socketRefCount -= 1;
   if (socketRefCount < 0) socketRefCount = 0;
-  // Keep the socket open when switching routes (/ <-> /waiting) in the same tab.
 }
 
 function teardownSharedSocket() {
@@ -38,25 +39,63 @@ if (typeof window !== 'undefined') {
   window.addEventListener('pagehide', teardownSharedSocket);
 }
 
+async function fetchQueueSnapshot() {
+  const base = import.meta.env.VITE_API_URL || '';
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${base}/api/queue`, { signal: controller.signal });
+    if (!res.ok) throw new Error('Failed to fetch queue');
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      throw new Error('API returned an unexpected response');
+    }
+    return await res.json();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export function useQueueSocket() {
   const [queue, setQueue] = useState(null);
   const [connected, setConnected] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
   const [ready, setReady] = useState(false);
+  const [waking, setWaking] = useState(false);
   const [error, setError] = useState(null);
+  const wakeRetryRef = useRef(null);
 
   const refresh = useCallback(async () => {
     try {
-      const base = import.meta.env.VITE_API_URL || '';
-      const res = await fetch(`${base}/api/queue`);
-      if (!res.ok) throw new Error('Failed to fetch queue');
-      const data = await res.json();
+      const data = await fetchQueueSnapshot();
       setQueue(data);
       setError(null);
       setReady(true);
+      setWaking(false);
+      if (wakeRetryRef.current) {
+        clearTimeout(wakeRetryRef.current);
+        wakeRetryRef.current = null;
+      }
     } catch (err) {
-      setError(err.message);
+      if (!ready) {
+        setWaking(true);
+        setError(null);
+        if (!wakeRetryRef.current) {
+          wakeRetryRef.current = setTimeout(() => {
+            wakeRetryRef.current = null;
+            refresh();
+          }, WAKE_RETRY_MS);
+        }
+      } else {
+        setError(err.message || 'Failed to fetch queue');
+      }
     }
+  }, [ready]);
+
+  useEffect(() => {
+    return () => {
+      if (wakeRetryRef.current) clearTimeout(wakeRetryRef.current);
+    };
   }, []);
 
   useEffect(() => {
@@ -88,12 +127,14 @@ export function useQueueSocket() {
       setQueue(snapshot);
       setError(null);
       setReady(true);
+      setWaking(false);
     };
 
     const onQueueUpdate = (snapshot) => {
       setQueue(snapshot);
       setError(null);
       setReady(true);
+      setWaking(false);
     };
 
     const onQueueError = (payload) => {
@@ -122,8 +163,8 @@ export function useQueueSocket() {
     };
   }, [refresh]);
 
-  const connecting = !ready && !connected && !reconnecting;
+  const connecting = !ready && !connected && !reconnecting && !waking;
   const syncing = ready && !connected && !reconnecting;
 
-  return { queue, connected, reconnecting, connecting, syncing, ready, error, refresh };
+  return { queue, connected, reconnecting, connecting, syncing, waking, ready, error, refresh };
 }

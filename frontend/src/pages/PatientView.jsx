@@ -9,8 +9,9 @@ function formatTime(iso) {
 }
 
 export default function PatientView() {
-  const { queue, connected, reconnecting, connecting, syncing, error } = useQueueSocket();
-  const pillState = { connected, reconnecting, connecting, syncing };
+  const { queue, connected, reconnecting, connecting, syncing, waking, ready, error } =
+    useQueueSocket();
+  const pillState = { connected, reconnecting, connecting, syncing, waking };
 
   const hasCurrent = queue?.currentToken != null;
   const liveElapsed = useLiveElapsed(
@@ -34,6 +35,11 @@ export default function PatientView() {
         </span>
       </header>
 
+      {waking && !ready && (
+        <div className="banner info">
+          Waking API on Render… first load after idle can take up to 30 seconds.
+        </div>
+      )}
       {error && <div className="banner error">{error}</div>}
 
       <section className="hero-card">
